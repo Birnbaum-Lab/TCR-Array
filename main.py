@@ -7,15 +7,17 @@ Imports other main scripting files:
 to achieve a consistent workflow
 '''
 
+from __future__ import print_statement
+
 from demultiplex import *
 from arraypublish import *
 
-print 'Starting main...'
+print('Starting main...')
 
 sorter = SequenceSorter()
 sorter.load_data('TCRs.fastq')
 sorter.start()
 sorter.publish_data()
 
-print 'Finished main.'
+print('Finished main.')
 

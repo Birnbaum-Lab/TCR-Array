@@ -4,6 +4,7 @@ This is for formating data once concensus reads have been found and HiV regions 
 '''
 
 # standard libraries
+from __future__ import print_statement
 
 # nonstandard libraries
 from openpyxl import Workbook,load_workbook
@@ -22,7 +23,9 @@ Function:
     Generates some cute figures from the output of HiV...
 '''
 class ArrayPublish:
+    # intialize program with appropriate barcodes (available for modification)
     def __init__(self):
+
         self.anchor5 = 'CCAGGGTTTTCCCAGTCACGAC' # variable region ID
         self.anchor3_alpha = 'GACTCCCAAATCAATGTGC' # alpha chain ID
         self.anchor3_beta = 'GGTCTCCTTGTTTGAGCCATC' # beta chain ID
