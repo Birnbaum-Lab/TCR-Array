@@ -15,7 +15,7 @@ def main():
     print 'Starting main...'
 
     sorter = SequenceSorter()
-    sorter.load_data('TCRs.fastq')
+    sorter.load_data('TCRs.fasta')
     sorter.start()
     sorter.publish_data()
 
@@ -48,6 +48,7 @@ class SequenceSorter:
         self.column_counts = [0 for i in xrange(len(self.column_ids))] 
 
         self.sequences = [[[[] for c in self.column_ids] for b in self.row_ids] for a in self.plate_ids]
+        self.qualities = [[[[] for c in self.column_ids] for b in self.row_ids] for a in self.plate_ids]
 
     # load fasta/fastq data
     def load_data(self,fname=None):
@@ -57,11 +58,18 @@ class SequenceSorter:
         if not os.path.exists(fname):
             print 'File not in directory, data not loaded!'
             return False
+        if not fname.endswith('.fasta') and not fname.endswith('.fastq'):
+            print 'Currently only accepting .fasta and .fastq files!'
+            return False
         else:
             print 'Data selected successfully!'
             self.fname = fname
+            if fname.endswith('.fasta'): # fasta parsing settings
+                self.perline,self.seqshift,self.qualshift = 2,1,None
+            if fname.endswith('.fastq'): # fastq parsing settings
+                self.perline,self.seqshift,self.qualshift = 4,1,3     
             return True
-
+                
     # start main program execution and identification
     def start(self):
         print 'Starting sequence sorting...'
@@ -71,16 +79,19 @@ class SequenceSorter:
             print 'File loaded.'
             for i,line in enumerate(lines):
                 if i%1000000 == 0 and i != 0: print '{} lines processed...'.format(i)
-                if i%4 == 1:
+                if i%self.perline == self.seqshift:
                     var = len(line)
                     if sum([1 for id in self.plate_ids if line[2:7] == id]) == 1:
                         if sum([1 for id in self.row_ids if line[9:14] == id]) == 1:
                             if sum([1 for id in self.column_ids if line[(var-8):(var-3)] == id]) == 1:
-                                self.count_sequence(line)            
+                                if self.qualshift: # if this is a file format with quality scores 
+                                    self.count_sequence(line,lines[i+2])            
+                                else: # otherwise, we will just get a filler quality score (~ = 100% quality)
+                                    self.count_sequence(line)
         print 'Finished sorting!'
 
     # this quick function adds sequence to appropriate bin 
-    def count_sequence(self,line):
+    def count_sequence(self,line,qual=None):
         var = len(line)
         a = [i for i,id in enumerate(self.plate_ids) if line[2:7] == id][0]
         b = [i for i,id in enumerate(self.row_ids) if line[9:14] == id][0]
@@ -89,6 +100,14 @@ class SequenceSorter:
         self.row_counts[b] += 1       
         self.column_counts[c] += 1       
         self.sequences[a][b][c].append(line)
+        if qual:
+            self.qualities[a][b][c].append(qual)
+        else:
+            try: self.qualities[a][b][c].append('~'*len(line))
+            except MemoryError:
+                print 'Line:',len(line)
+                print line
+                raw_input('Wait..')
 
     # create a bunch of text files
     def publish_data(self,mode='group',silent=True,threshold=90):
@@ -112,25 +131,27 @@ class SequenceSorter:
         elif mode == 'group':
             # write a bunch of txt files
             with open('seq_formatted.fastq','w') as myfile:
-                for p_id,d3 in zip(self.plate_labels,self.sequences):
-                    for r_id,d2 in zip(self.row_labels,d3):
-                        for c_id,d1 in zip(self.column_labels,d2):
+                for p_id,d3,d3q in zip(self.plate_labels,self.sequences,self.qualities):
+                    for r_id,d2,d2q in zip(self.row_labels,d3,d3q):
+                        for c_id,d1,d1q in zip(self.column_labels,d2,d2q):
                             if not silent: print '{}{}{} has {} sequences.'.format(p_id,r_id,c_id,len(d1))
-                            for seq in d1:
+                            for seq,quality in zip(d1,d1q):
                                 if self.anchor5 in seq and self.anchor3_alpha in seq: # check if alpha
                                     entry = seq[seq.index(self.anchor5):seq.index(self.anchor3_alpha)+len(self.anchor3_alpha)].replace('\n','') + '\n'
+                                    qual = quality[seq.index(self.anchor5):seq.index(self.anchor3_alpha)+len(self.anchor3_alpha)].replace('\n','') + '\n'
                                     if len(entry) > threshold:
                                         myfile.write('@miseq_alpha\n')
                                         myfile.write('{}{}{}'.format(p_id,r_id,c_id) + 'AA' + entry)
                                         myfile.write('+\n')
-                                        myfile.write('~'*len('{}{}{}' .format(p_id,r_id,c_id) + entry) + '\n')
+                                        myfile.write('~'*(len('{}{}{}' .format(p_id,r_id,c_id))+2) + qual + '\n')
                                 elif self.anchor5 in seq and self.anchor3_beta in seq: # check if beta
                                     entry = seq[seq.index(self.anchor5):seq.index(self.anchor3_beta)+len(self.anchor3_beta)].replace('\n','') + '\n'
+                                    qual = quality[seq.index(self.anchor5):seq.index(self.anchor3_beta)+len(self.anchor3_beta)].replace('\n','') + '\n'
                                     if len(entry) > threshold:
-                                        myfile.write('@mysiq_beta \n')
+                                        myfile.write('@miseq_beta \n')
                                         myfile.write('{}{}{}'.format(p_id,r_id,c_id) + 'GG' + entry) 
                                         myfile.write('+\n')
-                                        myfile.write('~'*len('{}{}{}' .format(p_id,r_id,c_id) + entry)+'\n')
+                                        myfile.write('~'*(len('{}{}{}' .format(p_id,r_id,c_id))+2) + qual + '\n')
 
         if not silent: print 'Finished publishing!' 
 
