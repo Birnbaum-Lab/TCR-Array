@@ -19,7 +19,7 @@ def main():
     sorter = SequenceSorter()
     sorter.load_data('TCRs.fasta')
     sorter.start()
-    sorter.publish_data()
+    sorter.publish()
 
     print('Finished main.')
 
@@ -111,7 +111,7 @@ class SequenceSorter:
                 return False 
 
     # create a bunch of text files
-    def publish_data(self,mode='group',silent=True,threshold=90):
+    def publish(self,mode='group',silent=True,threshold=90):
         if not silent: print('Publishing data...')
             
         # separate each well into different text file

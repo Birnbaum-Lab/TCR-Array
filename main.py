@@ -17,7 +17,11 @@ print('Starting main...')
 sorter = SequenceSorter()
 sorter.load_data('TCRs.fastq')
 sorter.start()
-sorter.publish_data()
+sorter.publish()
+
+publish = ArrayPublish()
+publish.train(sorter)
+
 
 print('Finished main.')
 
